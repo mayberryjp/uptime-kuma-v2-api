@@ -23,6 +23,9 @@ class MonitorCreate(BaseModel):
     # ping / tcp
     hostname: Optional[str] = Field(None, max_length=255)
     port: Optional[int] = Field(None, ge=1, le=65535)
+    # docker (docker_host must refer to an existing Kuma Docker host)
+    docker_container: Optional[str] = Field(None, max_length=255)
+    docker_host: Optional[int] = Field(None, ge=1)
     # common
     interval: Optional[int] = Field(None, ge=20, le=86400)
     retryInterval: Optional[int] = Field(None, ge=0, le=86400)
@@ -38,6 +41,8 @@ class MonitorCreate(BaseModel):
             raise ValueError(
                 f"unsupported monitor type '{self.type}'. v1 supports: {', '.join(SUPPORTED_TYPES)}"
             )
+        if self.type == "docker" and (not self.docker_container or self.docker_host is None):
+            raise ValueError("docker monitors require docker_container and docker_host")
         return self.type
 
 
@@ -48,6 +53,8 @@ class MonitorPatch(BaseModel):
     keyword: Optional[str] = Field(None, max_length=500)
     hostname: Optional[str] = Field(None, max_length=255)
     port: Optional[int] = Field(None, ge=1, le=65535)
+    docker_container: Optional[str] = Field(None, max_length=255)
+    docker_host: Optional[int] = Field(None, ge=1)
     interval: Optional[int] = Field(None, ge=20, le=86400)
     retryInterval: Optional[int] = Field(None, ge=0, le=86400)
     resendInterval: Optional[int] = Field(None, ge=0, le=100000)
@@ -69,6 +76,8 @@ class MonitorOut(BaseModel):
     url: Optional[str] = None
     hostname: Optional[str] = None
     port: Optional[int] = None
+    docker_container: Optional[str] = None
+    docker_host: Optional[int] = None
     interval: Optional[int] = None
     active: Optional[bool] = None
     maxretries: Optional[int] = None
@@ -94,6 +103,8 @@ class MonitorOut(BaseModel):
             url=m.get("url"),
             hostname=m.get("hostname"),
             port=m.get("port"),
+            docker_container=m.get("docker_container"),
+            docker_host=m.get("docker_host"),
             interval=m.get("interval"),
             active=m.get("active"),
             maxretries=m.get("maxretries"),
@@ -135,6 +146,21 @@ class TagOut(BaseModel):
     id: int
     name: str
     color: Optional[str] = None
+class DockerHostOut(BaseModel):
+    """Safe Docker host summary; never return daemon connection details."""
+    id: int
+    name: str
+
+    @classmethod
+    def from_kuma(cls, host: dict) -> "DockerHostOut":
+        return cls(id=host["id"], name=host.get("name", ""))
+
+
+class DockerHostsOut(BaseModel):
+    hosts: list[DockerHostOut]
+    count: int
+
+
 
 
 class TagsOut(BaseModel):

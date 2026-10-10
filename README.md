@@ -6,7 +6,7 @@
 
 A small, self-hostable **REST API for Uptime Kuma 2.x**.
 
-**Prebuilt image:** `ghcr.io/paul-hph/uptime-kuma-v2-api:latest` (linux/amd64 + arm64).
+**Prebuilt Alpine image** (linux/amd64 + arm64): `docker.io/<dockerhub-user>/uptime-kuma-v2-api:latest`.
 Using **Coolify**? See **[COOLIFY.md](COOLIFY.md)** — add the API to an existing Kuma
 stack with one compose block and three env vars.
 
@@ -35,7 +35,7 @@ thin, robust FastAPI wrapper built specifically for **Kuma 2.x**.
 ## Quick start (against an existing Kuma)
 Uses the prebuilt image — nothing to build:
 ```bash
-cp .env.example .env   # set KUMA_USERNAME, KUMA_PASSWORD (non-2FA user), API_KEYS
+cp .env.example .env   # set DOCKERHUB_USERNAME, KUMA_USERNAME, KUMA_PASSWORD, API_KEYS
 docker compose up -d
 curl -H "X-API-Key: <your key>" http://localhost:8000/v1/monitors
 ```
@@ -47,7 +47,7 @@ docker run -d -p 127.0.0.1:8000:8000 \
   -e KUMA_SERVER=http://your-kuma:3001 \
   -e KUMA_USERNAME=admin -e KUMA_PASSWORD=secret \
   -e API_KEYS="$(python3 -c 'import secrets;print(secrets.token_urlsafe(32))')" \
-  ghcr.io/paul-hph/uptime-kuma-v2-api:latest
+  docker.io/<dockerhub-user>/uptime-kuma-v2-api:latest
 ```
 
 ## Endpoints (`/v1`)
@@ -56,9 +56,11 @@ docker run -d -p 127.0.0.1:8000:8000 \
 | GET | `/health` | process alive (no auth) |
 | GET | `/ready` | connected + authenticated to Kuma |
 | GET | `/v1/monitors` | list (cached snapshot, `X-Kuma-Cache-Age` header) |
+| GET | `/v1/docker-hosts` | list configured Docker host IDs and names |
 | GET | `/v1/monitors/{id}` | single monitor |
 | GET | `/v1/monitors/{id}/beats?hours=24` | heartbeats |
-| POST | `/v1/monitors` | create (`http`, `ping`, `tcp`, `keyword`, `group`) |
+| DELETE | `/v1/monitors/{id}/beats` · `/v1/beats` | clear one monitor's or all monitors' heartbeat history |
+| POST | `/v1/monitors` | create (`http`, `ping`, `tcp`, `keyword`, `group`, `docker`) |
 | PATCH | `/v1/monitors/{id}` | edit (fetch-merge-edit; `parent` moves into a group) |
 | DELETE | `/v1/monitors/{id}` | delete |
 | POST | `/v1/monitors/{id}/pause` · `/resume` | pause/resume |

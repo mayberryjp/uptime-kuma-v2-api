@@ -10,7 +10,7 @@ services:
     # ports: ["3001:3001"]
 
   uptime-kuma-v2-api:
-    image: ghcr.io/paul-hph/uptime-kuma-v2-api:latest
+    image: "docker.io/${DOCKERHUB_USERNAME:?set DOCKERHUB_USERNAME}/uptime-kuma-v2-api:latest"
     pull_policy: always
     depends_on:
       - uptime-kuma

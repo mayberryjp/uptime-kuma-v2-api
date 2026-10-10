@@ -25,7 +25,7 @@ from .kuma_client import (
 from .monitors import defaults
 from .monitors.schemas import (
     ActionResult, BeatsOut, CreateResult, MaintenanceCreate, MaintenanceCreateResult,
-    MaintenanceMonitorsIn, MonitorCreate, MonitorListOut, MonitorNotificationIn,
+    DockerHostOut, DockerHostsOut, MaintenanceMonitorsIn, MonitorCreate, MonitorListOut, MonitorNotificationIn,
     MonitorOut, MonitorPatch, MonitorTagIn, NotificationCreate, NotificationCreateResult,
     SettingsIn, StatusPageCreate, StatusPageCreateResult, StatusPageMonitorsIn,
     StatusPageMonitorsResult, TagCreate, TagOut, TagsOut,
@@ -144,6 +144,17 @@ async def list_monitors(request: Request, stale_ok: bool = False):
                         headers={"X-Kuma-Cache-Age": str(age) if age is not None else "n/a"})
 
 
+@app.get("/v1/docker-hosts", dependencies=[Depends(require_api_key)], response_model=DockerHostsOut)
+@limiter.limit(settings.RATE_LIMIT)
+async def list_docker_hosts(request: Request):
+    health = client.health()
+    hosts, updated_at = client.cached_docker_hosts()
+    if not health["authenticated"] or not health["socket_connected"] or not updated_at:
+        return JSONResponse(status_code=503, content={"detail": "Docker host cache not ready"})
+    out = [DockerHostOut.from_kuma(host).model_dump() for host in hosts]
+    return {"hosts": out, "count": len(out)}
+
+
 @app.get("/v1/monitors/{monitor_id}", dependencies=[Depends(require_api_key)], response_model=MonitorOut)
 @limiter.limit(settings.RATE_LIMIT)
 async def get_monitor(request: Request, monitor_id: int):
@@ -164,6 +175,20 @@ async def get_beats(request: Request, monitor_id: int, hours: int = Query(24, ge
     resp = await kcall("getMonitorBeats", (monitor_id, hours))
     data = resp.get("data") if isinstance(resp, dict) else resp
     return {"monitor_id": monitor_id, "hours": hours, "beats": data or []}
+
+
+@app.delete("/v1/monitors/{monitor_id}/beats", dependencies=[Depends(require_api_key)], response_model=ActionResult)
+@limiter.limit(settings.RATE_LIMIT)
+async def delete_monitor_beats(request: Request, monitor_id: int):
+    await kcall("clearHeartbeats", monitor_id, mutation=True)
+    return ActionResult(msg="heartbeats and uptime statistics cleared")
+
+
+@app.delete("/v1/beats", dependencies=[Depends(require_api_key)], response_model=ActionResult)
+@limiter.limit(settings.RATE_LIMIT)
+async def delete_all_beats(request: Request):
+    await kcall("clearStatistics", mutation=True)
+    return ActionResult(msg="all heartbeats and uptime statistics cleared")
 
 
 @app.get("/v1/beats", dependencies=[Depends(require_api_key)])

@@ -21,6 +21,17 @@ def test_ping_and_tcp_have_accepted_statuscodes():
         assert p["type"] == t
 
 
+def test_docker_payload_includes_host_and_container():
+    p = defaults.build_payload("docker", {
+        "name": "web",
+        "docker_host": 2,
+        "docker_container": "web-1",
+    })
+    assert p["type"] == "docker"
+    assert p["docker_host"] == 2
+    assert p["docker_container"] == "web-1"
+
+
 def test_none_values_do_not_override_defaults():
     p = defaults.build_payload("http", {"name": "x", "interval": None})
     assert p["interval"] == 60  # default kept, None ignored

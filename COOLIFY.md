@@ -1,7 +1,7 @@
 # Adding the API to an existing Uptime Kuma stack in Coolify
 
 This adds a REST API to an Uptime Kuma you already run in Coolify. You don't build
-anything — Coolify pulls the prebuilt image `ghcr.io/paul-hph/uptime-kuma-v2-api`.
+anything — Coolify pulls the prebuilt image from Docker Hub.
 
 Two ways: **A) add a service to the existing Kuma stack (recommended)** or
 **B) deploy as a standalone resource**.
@@ -19,7 +19,7 @@ name, and Coolify gives the API its own HTTPS domain automatically.
 
    ```yaml
      uptime-kuma-v2-api:
-       image: ghcr.io/paul-hph/uptime-kuma-v2-api:latest
+      image: "docker.io/${DOCKERHUB_USERNAME:?set DOCKERHUB_USERNAME}/uptime-kuma-v2-api:latest"
        environment:
          # Coolify generates a public HTTPS URL for port 8000 and routes it via its proxy:
          - SERVICE_FQDN_KUMAAPI_8000
@@ -34,6 +34,7 @@ name, and Coolify gives the API its own HTTPS domain automatically.
    ```
 
 3. Go to **Environment Variables** and add:
+  - `DOCKERHUB_USERNAME` = your Docker Hub username
    - `KUMA_USERNAME` = a Kuma login **without 2FA**
    - `KUMA_PASSWORD` = that user's password
    - `API_KEYS` = one or more strong random keys (comma-separated). Generate one:
@@ -59,12 +60,12 @@ That's it. TLS, networking, and restarts are handled by Coolify.
 Use this if you'd rather keep the API separate from the Kuma stack.
 
 1. Coolify → **+ New → Resource → Docker Image**.
-2. Image: `ghcr.io/paul-hph/uptime-kuma-v2-api:latest`.
+2. Image: `docker.io/<dockerhub-user>/uptime-kuma-v2-api:latest` (replace `<dockerhub-user>` with your Docker Hub username).
 3. Set environment variables:
    - `KUMA_SERVER` = a URL the API can reach your Kuma at. Easiest is Kuma's public
      URL, e.g. `https://uptime.example.com`. (For internal networking, attach both
      to the same Coolify network and use the container name + `:3001`.)
-   - `KUMA_USERNAME`, `KUMA_PASSWORD` (non-2FA), `API_KEYS`, `FORWARDED_ALLOW_IPS=*`.
+  - `KUMA_USERNAME`, `KUMA_PASSWORD` (non-2FA), `API_KEYS`, `FORWARDED_ALLOW_IPS=*`.
 4. Add a **Domain** for the resource (port 8000) so Coolify gives it HTTPS.
 5. Deploy and test as above.
 
@@ -76,8 +77,9 @@ Use this if you'd rather keep the API separate from the Kuma stack.
   health check). Returns 503 until the first monitor snapshot is loaded.
 
 ## Updating
-The image tag `:latest` follows the repo's `main`. To update, redeploy the service
-in Coolify (it re-pulls). Pin a version tag (e.g. `:v0.1.0`) if you want stability.
+The Alpine image tags `:latest` and `:<sha>` follow the repo's `main`. To update,
+redeploy the service in Coolify (it re-pulls). Pin a full commit SHA if you want a
+fixed build.
 
 ## Replacing an old REST API (e.g. medaziz `uptimekuma_restapi`)
 Remove or stop the old `kuma-api` service in the same stack, add this one as above.

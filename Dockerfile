@@ -1,11 +1,14 @@
-FROM python:3.12-slim
+FROM python:3.12-alpine
 
 # non-root user
-RUN useradd -m -u 10001 appuser
+RUN adduser -D -u 10001 appuser
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN apk add --no-cache libstdc++ && \
+    apk add --no-cache --virtual .build-deps build-base cargo linux-headers && \
+    pip install --no-cache-dir -r requirements.txt && \
+    apk del .build-deps
 
 COPY app ./app
 

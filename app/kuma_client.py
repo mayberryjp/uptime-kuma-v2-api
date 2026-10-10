@@ -83,7 +83,8 @@ class KumaClient:
 
         self._cache_lock = threading.Lock()
         self._monitors = {}
-        self._ts = {"monitorList": 0.0, "heartbeat": 0.0, "uptime": 0.0}
+        self._ts = {"monitorList": 0.0, "dockerHostList": 0.0, "heartbeat": 0.0, "uptime": 0.0}
+        self._docker_hosts = []
 
         self._register_handlers()
 
@@ -116,6 +117,8 @@ class KumaClient:
         def disconnect():
             self._token = None
             self._cache_loaded.clear()
+            with self._cache_lock:
+                self._ts["dockerHostList"] = 0.0
             self._set_state(DISCONNECTED)
 
         @sio.on("monitorList")
@@ -137,6 +140,12 @@ class KumaClient:
             with self._cache_lock:
                 self._monitors.pop(str(monitor_id), None)
                 self._ts["monitorList"] = time.time()
+
+        @sio.on("dockerHostList")
+        def on_docker_host_list(data):
+            with self._cache_lock:
+                self._docker_hosts = list(data or [])
+                self._ts["dockerHostList"] = time.time()
 
         @sio.on("*")
         def catch_all(_event, *_args):
@@ -276,6 +285,10 @@ class KumaClient:
     def cached_monitor(self, monitor_id):
         with self._cache_lock:
             return self._monitors.get(str(monitor_id)), self._ts["monitorList"]
+
+    def cached_docker_hosts(self):
+        with self._cache_lock:
+            return list(self._docker_hosts), self._ts["dockerHostList"]
 
     def evict(self, monitor_id):
         with self._cache_lock:

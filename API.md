@@ -49,6 +49,13 @@ Base URL: `http://<host>:8000` (put behind a TLS proxy in production).
 
 ## Monitors
 
+### `GET /v1/docker-hosts` — list configured Docker hosts
+Returns host IDs and names for use as `docker_host` when creating a Docker monitor. Connection details
+are not included. Hosts are sent by Kuma after authentication; `503` means the host list has not arrived yet.
+```json
+{ "hosts": [ { "id": 2, "name": "local Docker" } ], "count": 1 }
+```
+
 ### `GET /v1/monitors` — list
 Returns the cached snapshot. Response header `X-Kuma-Cache-Age` = seconds since last update.
 Query: `?stale_ok=true` to allow a stale cache while disconnected (default `false` → `503`).
@@ -82,6 +89,15 @@ Query: `?stale_ok=true` to allow a stale cache while disconnected (default `fals
 ```
 `status`: 0=down, 1=up, 2=pending, 3=maintenance. `beats` are Kuma heartbeat objects.
 
+### `DELETE /v1/monitors/{id}/beats` — clear one monitor's heartbeat history
+Uses Kuma's `clearHeartbeats` operation, which also clears that monitor's aggregated uptime statistics.
+**Response `200`:** `{ "ok": true, "msg": "heartbeats and uptime statistics cleared" }`
+
+### `DELETE /v1/beats` — clear all heartbeat histories
+Uses Kuma's `clearStatistics` operation, which clears heartbeat history and aggregated uptime statistics
+for all monitors. Active monitors are restarted by Kuma and will begin collecting new heartbeats.
+**Response `200`:** `{ "ok": true, "msg": "all heartbeats and uptime statistics cleared" }`
+
 ### `GET /v1/beats?ids=1,2,3&hours=24&limit=50` — heartbeats for many monitors (bulk)
 One round-trip for a whole page of monitors. `ids`: comma-separated (max 200). `limit`: keep only the
 last N beats per monitor (0 = all). Beats are fetched server-side (local to Kuma), so this is far cheaper
@@ -99,7 +115,8 @@ than one remote request per monitor.
 A monitor maps to `null` if its beats could not be fetched.
 
 ### `POST /v1/monitors` — create
-Supported `type`: `http`, `ping`, `tcp`, `keyword`, `group`. Only `type` + `name` are required;
+Supported `type`: `http`, `ping`, `tcp`, `keyword`, `group`, `docker`. Only `type` + `name` are required
+except for Docker monitors;
 type-specific and common fields are optional (sensible defaults applied, incl. `conditions: []`).
 A `group` is a container monitor with no probe of its own — create one (`{ "type": "group",
 "name": "Care-Kunden" }`), then nest monitors under it by passing its id as `parent`.
@@ -127,6 +144,8 @@ A `group` is a container monitor with no probe of its own — create one (`{ "ty
 **Request (ping):** `{ "type": "ping", "name": "GW", "hostname": "1.1.1.1" }`
 **Request (tcp):**  `{ "type": "tcp", "name": "DNS", "hostname": "1.1.1.1", "port": 53 }`
 **Request (keyword):** `{ "type": "keyword", "name": "KW", "url": "https://a.b", "keyword": "ok" }`
+**Request (docker):** `{ "type": "docker", "name": "Web container", "docker_host": 2, "docker_container": "web-1" }`
+`docker_host` must be the ID of a Docker host already configured in Kuma; `docker_container` is its container name or ID.
 
 **Response `200`:**
 ```json
@@ -140,7 +159,8 @@ A `group` is a container monitor with no probe of its own — create one (`{ "ty
 ### `PATCH /v1/monitors/{id}` — edit (fetch-merge-edit)
 Send only the fields you want to change (same names/bounds as create).
 **Request:** `{ "name": "Renamed", "interval": 120 }`
-Pass `parent` to move a monitor into a monitor group: `{ "parent": 1400 }`.
+Pass `parent` to move a monitor into a monitor group: `{ "parent": 1400 }`. Docker monitors can also update
+`docker_host` and `docker_container`.
 **Response `200`:** `{ "ok": true, "msg": "Edited Successfully." }` · `404` if not found.
 
 ### `DELETE /v1/monitors/{id}`

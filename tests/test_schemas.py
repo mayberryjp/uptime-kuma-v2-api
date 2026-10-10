@@ -4,7 +4,7 @@ from pydantic import ValidationError
 from app.monitors.schemas import (
     MonitorCreate, MonitorPatch, MonitorOut, StatusPageMonitorsIn, StatusPageCreate,
     NotificationCreate, MonitorNotificationIn, MaintenanceCreate, MaintenanceMonitorsIn,
-    SettingsIn,
+    DockerHostOut, SettingsIn,
 )
 from app.monitors import defaults
 
@@ -12,6 +12,13 @@ from app.monitors import defaults
 def test_validate_type_accepts_supported():
     assert MonitorCreate(type="http", name="x").validate_type() == "http"
     assert MonitorCreate(type="ping", name="x").validate_type() == "ping"
+
+
+def test_docker_monitor_requires_host_and_container():
+    body = MonitorCreate(type="docker", name="web", docker_host=2, docker_container="web-1")
+    assert body.validate_type() == "docker"
+    with pytest.raises(ValueError, match="docker_container and docker_host"):
+        MonitorCreate(type="docker", name="web").validate_type()
 
 
 def test_validate_type_rejects_unsupported():
@@ -27,6 +34,23 @@ def test_patch_changed_drops_none():
 def test_monitor_out_from_kuma():
     out = MonitorOut.from_kuma({"id": 5, "name": "m", "type": "http", "url": "https://a", "active": True})
     assert out.id == 5 and out.name == "m" and out.type == "http" and out.active is True
+
+
+def test_docker_monitor_fields_round_trip_through_output_and_patch():
+    out = MonitorOut.from_kuma({
+        "id": 5, "name": "web", "type": "docker",
+        "docker_host": 2, "docker_container": "web-1",
+    })
+    assert out.docker_host == 2 and out.docker_container == "web-1"
+    assert MonitorPatch(docker_container="web-2").changed() == {"docker_container": "web-2"}
+
+
+def test_docker_host_output_hides_connection_details():
+    host = DockerHostOut.from_kuma({
+        "id": 2, "name": "local", "_dockerDaemon": "/var/run/docker.sock",
+        "_dockerType": "socket", "user_id": 1,
+    })
+    assert host.model_dump() == {"id": 2, "name": "local"}
 
 
 def test_create_accepts_parent_and_flows_into_payload():

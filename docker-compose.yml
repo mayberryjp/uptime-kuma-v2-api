@@ -2,7 +2,7 @@
 # Put this behind a TLS reverse proxy (Caddy/nginx/Traefik/Cloudflare) in production.
 services:
   uptime-kuma-v2-api:
-    image: ghcr.io/paul-hph/uptime-kuma-v2-api:latest
+    image: "docker.io/${DOCKERHUB_USERNAME:?set DOCKERHUB_USERNAME}/uptime-kuma-v2-api:latest"
     pull_policy: always
     # To build locally instead, comment the image line and uncomment: build: .
     # build: .
